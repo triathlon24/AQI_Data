@@ -1,0 +1,50 @@
+name: Hourly Screenshot
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare Directory
+        run: mkdir -p screenshots
+
+      - name: Take Screenshot
+        uses: karol-brejna-i/webpage-screenshot-action@v1
+        with:
+          url: https://www.iqair.com/philippines/davao/davao-city/addu-jacinto-campus # <--- DOUBLE CHECK YOUR URL
+          output: screenshots/latest-shot.png
+          mode: wholePage
+
+      - name: Rename and Save
+        env:
+          TZ: 'Asia/Manila' #Sets the timezone to PHT for this step
+        run: |
+          mkdir -p screenshots
+          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M')
+          if [ -f screenshots/latest-shot.png ]; then
+            cp screenshots/latest-shot.png "screenshots/shot_${TIMESTAMP}.png"
+            echo "Last successful run: ${TIMESTAMP}}" > last_run.txt
+          else
+            echo "Screenshot file not found!"
+            exit 1
+          fi
+
+      - name: Commit and Push
+        env:
+          TZ: 'Asia/Manila'
+        run: |
+          git config --global user.name "Screenshot Bot"
+          git config --global user.email "bot@github.com"
+          git add screenshots/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Capture: $(date)"
+          #git commit -m "Capture: $(date)" || echo "No changes to commit"
+          git pull --rebase origin main
+          git push origin main
